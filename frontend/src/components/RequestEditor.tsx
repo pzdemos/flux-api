@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Select, Input, Button, Tabs, Space, message, Typography } from 'antd';
+import { Select, Input, Button, Tabs, Space, message, Typography, Modal, Form } from 'antd';
 import { SendOutlined, SaveOutlined, LoadingOutlined } from '@ant-design/icons';
 import { Allotment } from 'allotment';
 import Editor from '@monaco-editor/react';
@@ -68,20 +68,35 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     }
   };
 
-  const handleSave = async () => {
-    if (!request.name || !request.url) {
-      message.error('Please fill in the required fields');
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [saveForm] = Form.useForm();
+
+  const handleSaveClick = () => {
+      const isNewRequest = !request._id || request._id.length !== 24;
+      if (isNewRequest || !request.name || request.name === 'Untitled Request') {
+        saveForm.setFieldsValue({ name: request.name === 'Untitled Request' ? '' : request.name });
+        setSaveModalVisible(true);
+      } else {
+        executeSave(request.name);
+      }
+  };
+
+  const executeSave = async (finalName: string) => {
+    if (!request.url) {
+      message.error('Please fill in the URL');
       return;
     }
 
     setLoading(true);
+    setSaveModalVisible(false);
+    
+    // Update local state and store with new name
+    updateRequest({ name: finalName });
+
     try {
       let res;
-      // MongoDB ObjectIds are exactly 24 hex characters
-      // If It's longer or shorter (nanoid is usually 21), it is a local unsaved tab.
       const isNewRequest = !request._id || request._id.length !== 24;
-
-      const payload = { ...request, projectId };
+      const payload = { ...request, name: finalName, projectId };
       
       if (!isNewRequest) {
         res = await requestApi.update(request._id as string, payload);
@@ -207,7 +222,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
         </Space.Compact>
         <Button 
           icon={<SaveOutlined />} 
-          onClick={handleSave}
+          onClick={handleSaveClick}
           size="large"
           className="ml-2 font-semibold flex items-center justify-center shrink-0"
         >
@@ -282,6 +297,28 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
           </Allotment.Pane>
         </Allotment>
       </div>
+
+      <Modal
+        title="Save Request"
+        open={saveModalVisible}
+        onOk={() => {
+          saveForm.validateFields().then((values) => {
+            executeSave(values.name);
+          });
+        }}
+        onCancel={() => setSaveModalVisible(false)}
+        okText="Save"
+      >
+        <Form form={saveForm} layout="vertical" className="mt-4">
+          <Form.Item
+            name="name"
+            label="Request Name"
+            rules={[{ required: true, message: 'Please enter a name for this request' }]}
+          >
+            <Input placeholder="e.g. Get User Profile" autoFocus />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };
