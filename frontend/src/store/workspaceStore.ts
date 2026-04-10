@@ -52,11 +52,29 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }),
 
       updateRequest: (id, updates) =>
-        set((state) => ({
-          openRequests: state.openRequests.map((r) =>
-            r._id === id ? { ...r, ...updates, isDirty: true } : r
-          ),
-        })),
+        set((state) => {
+          let newActiveId = state.activeRequestId;
+          
+          // If the _id is being updated (e.g., from nanoid to MongoDB ObjectId)
+          if (updates._id && updates._id !== id) {
+             if (state.activeRequestId === id) {
+                 newActiveId = updates._id;
+             }
+          }
+
+          return {
+            openRequests: state.openRequests.map((r) =>
+              r._id === id 
+                ? { 
+                    ...r, 
+                    ...updates, 
+                    isDirty: updates.isDirty !== undefined ? updates.isDirty : true 
+                  } 
+                : r
+            ),
+            activeRequestId: newActiveId
+          };
+        }),
 
       setActiveRequest: (id) => set({ activeRequestId: id }),
       setOpenRequests: (openRequests) => set({ openRequests }),

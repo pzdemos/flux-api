@@ -47,14 +47,18 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     setLoading(true);
     try {
       let res;
-      if (saveResponse && request._id) {
-        res = await requestApi.send(request._id, request);
+      const isNewRequest = !request._id || request._id.length !== 24;
+
+      if (saveResponse && !isNewRequest) {
+        res = await requestApi.send(request._id as string, request);
         setResponse(res.data.response);
         if (onSave) {
           onSave(res.data.request);
         }
       } else {
-        res = await requestApi.sendOnly(request);
+        const payload = { ...request };
+        delete payload._id; // Ensure we don't accidentally send nanoid
+        res = await requestApi.sendOnly(payload as ApiRequest);
         setResponse(res.data);
       }
     } catch (error: any) {
@@ -73,14 +77,18 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     setLoading(true);
     try {
       let res;
-      if (request._id) {
-        res = await requestApi.update(request._id, request);
+      // MongoDB ObjectIds are exactly 24 hex characters
+      // If It's longer or shorter (nanoid is usually 21), it is a local unsaved tab.
+      const isNewRequest = !request._id || request._id.length !== 24;
+
+      const payload = { ...request, projectId };
+      
+      if (!isNewRequest) {
+        res = await requestApi.update(request._id as string, payload);
         message.success('Request updated');
       } else {
-        res = await requestApi.create({
-          ...request,
-          projectId,
-        } as ApiRequest);
+        delete payload._id; // Remove local nanoid before sending to DB
+        res = await requestApi.create(payload as ApiRequest);
         message.success('Request saved');
       }
       if (onSave) {
