@@ -9,18 +9,26 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.1",
+    "@monaco-editor/react": "^4.7.0",
+    "allotment": "^1.20.5",
     "antd": "^5.11.0",
     "axios": "^1.6.0",
     "dayjs": "^1.11.10",
+    "lucide-react": "^1.8.0",
+    "nanoid": "^5.1.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.18.0",
-    "react18-json-view": "^0.2.6"
+    "react18-json-view": "^0.2.6",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.1.1",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.9",
+    "tailwindcss": "^3.4.19",
     "typescript": "^5.2.2",
     "vite": "^5.0.0"
   }

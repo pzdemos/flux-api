@@ -1,14 +1,7 @@
 import React from 'react';
-import { List, Typography, Tag, Space, Button, Empty, Tooltip } from 'antd';
-import {
-  FileTextOutlined,
-  DeleteOutlined,
-  ClockCircleOutlined,
-} from '@ant-design/icons';
+import { Space, Spin, Empty, Dropdown } from 'antd';
+import { MoreOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ApiRequest } from '../types';
-import dayjs from 'dayjs';
-
-const { Text } = Typography;
 
 interface RequestListProps {
   requests: ApiRequest[];
@@ -20,13 +13,13 @@ interface RequestListProps {
 }
 
 const methodColors: Record<string, string> = {
-  GET: 'blue',
-  POST: 'green',
-  PUT: 'orange',
-  DELETE: 'red',
-  PATCH: 'cyan',
-  HEAD: 'purple',
-  OPTIONS: 'purple',
+  GET: 'text-blue-500',
+  POST: 'text-green-500',
+  PUT: 'text-orange-500',
+  DELETE: 'text-red-500',
+  PATCH: 'text-cyan-500',
+  HEAD: 'text-purple-500',
+  OPTIONS: 'text-purple-500',
 };
 
 export const RequestList: React.FC<RequestListProps> = ({
@@ -34,82 +27,76 @@ export const RequestList: React.FC<RequestListProps> = ({
   selectedId,
   onSelect,
   onDelete,
-  onNew,
   loading = false,
 }) => {
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white dark:bg-[#1e1e1e]">
+        <Spin />
+      </div>
+    );
+  }
+
+  if (requests.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-4">
+        <Empty description="No requests" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-3 border-b">
-        <Space className="w-full justify-between">
-          <Text strong>Requests ({requests.length})</Text>
-          {onNew && (
-            <Button type="primary" size="small" onClick={onNew}>
-              + New
-            </Button>
-          )}
-        </Space>
-      </div>
-      <div className="flex-1 overflow-auto">
-        {loading ? (
-          <div className="p-4 text-center text-secondary">Loading...</div>
-        ) : requests.length === 0 ? (
-          <Empty
-            className="mt-10"
-            description="No requests yet"
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-          />
-        ) : (
-          <List
-            dataSource={requests}
-            renderItem={(request) => (
-              <List.Item
-                key={request._id}
-                onClick={() => onSelect(request)}
-                className={`cursor-pointer hover:bg-gray-50 ${
-                  selectedId === request._id ? 'bg-blue-50' : ''
-                }`}
-                actions={
-                  onDelete
-                    ? [
-                        <Button
-                          type="text"
-                          danger
-                          size="small"
-                          icon={<DeleteOutlined />}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(request._id);
-                          }}
-                        />,
-                      ]
-                    : undefined
-                }
+    <div className="flex flex-col bg-white dark:bg-[#1e1e1e] h-full">
+      {requests.map((request) => {
+        const isActive = selectedId === request._id;
+        return (
+          <div
+            key={request._id}
+            onClick={() => onSelect(request)}
+            className={`group px-4 py-2 flex items-center justify-between cursor-pointer select-none text-sm transition-colors border-b border-transparent ${
+              isActive 
+                ? 'bg-blue-50 dark:bg-[#2d2d2d] text-blue-700 dark:text-blue-400' 
+                : 'hover:bg-gray-100 dark:hover:bg-[#2a2d2e] text-gray-700 dark:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-3 overflow-hidden">
+              <span className={`font-bold text-[11px] w-10 shrink-0 ${methodColors[request.method] || 'text-gray-500'}`}>
+                {request.method}
+              </span>
+              <span className={`truncate ${isActive ? 'font-medium' : ''}`}>
+                {request.name || 'Untitled'}
+              </span>
+            </div>
+            
+            {onDelete && (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [
+                    {
+                      key: 'delete',
+                      danger: true,
+                      label: 'Delete Request',
+                      icon: <DeleteOutlined />,
+                      onClick: (e) => {
+                        e.domEvent.stopPropagation();
+                        onDelete(request._id);
+                      }
+                    }
+                  ]
+                }}
               >
-                <List.Item.Meta
-                  avatar={<FileTextOutlined className="text-gray-400" />}
-                  title={
-                    <Space>
-                      <Tag color={methodColors[request.method]}>{request.method}</Tag>
-                      <Text ellipsis className="max-w-[150px]">
-                        {request.name || 'Untitled'}
-                      </Text>
-                    </Space>
-                  }
-                  description={
-                    <Space size="small" className="text-xs">
-                      <Tooltip title={request.url}>
-                        <Text ellipsis className="max-w-[150px]">
-                          {request.url}
-                        </Text>
-                      </Tooltip>
-                    </Space>
-                  }
-                />
-              </List.Item>
+                <div 
+                  className={`opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded cursor-pointer shrink-0 transition-opacity flex items-center justify-center ${isActive ? 'opacity-100' : ''}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreOutlined className={isActive ? 'text-blue-500' : 'text-gray-500'} />
+                </div>
+              </Dropdown>
             )}
-          />
-        )}
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
