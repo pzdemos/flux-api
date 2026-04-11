@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Select, Input, Button, Tabs, Space, message, Typography, Modal, Form } from 'antd';
-import { SendOutlined, SaveOutlined, LoadingOutlined } from '@ant-design/icons';
+import { SendOutlined, SaveOutlined, LoadingOutlined, CodeOutlined, CopyOutlined, MenuOutlined } from '@ant-design/icons';
 import { Allotment } from 'allotment';
 import Editor from '@monaco-editor/react';
+import { useWorkspaceStore } from '../store/workspaceStore';
 import KeyValueEditor from './KeyValueEditor';
 import ResponseViewer from './ResponseViewer';
 import { requestApi } from '../services/api';
@@ -28,6 +29,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState(request.response);
+  const setMobileDrawerOpen = useWorkspaceStore(state => state.setMobileDrawerOpen);
 
   // Sync internal request when prop changes (for new tabs)
   // We don't overwrite if we are dirty, since Zustand manages it.
@@ -70,6 +72,55 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
 
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [saveForm] = Form.useForm();
+  const [curlModalVisible, setCurlModalVisible] = useState(false);
+
+  const generatedCurl = useMemo(() => {
+    if (!curlModalVisible) return '';
+    let curl = `curl --request ${request.method} \\\n  --url '${request.url || ''}'`;
+    
+    // Auth
+    if (request.auth?.type === 'bearer' && request.auth.bearer?.token) {
+      curl += ` \\\n  --header 'Authorization: Bearer ${request.auth.bearer.token}'`;
+    }
+    
+    // Headers
+    const headers = request.headers?.filter(h => h.key && h.enabled !== false) || [];
+    let hasContentType = false;
+    headers.forEach(h => {
+      curl += ` \\\n  --header '${h.key}: ${h.value}'`;
+      if (h.key.toLowerCase() === 'content-type') hasContentType = true;
+    });
+
+    // Params
+    const params = request.params?.filter(p => p.key && p.enabled !== false) || [];
+    if (params.length > 0) {
+      const queryString = params.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+      const hasQuery = request.url?.includes('?');
+      curl = curl.replace(`'${request.url}'`, `'${request.url}${hasQuery ? '&' : '?'}${queryString}'`);
+    }
+
+    // Body
+    if (request.body?.type === 'json' && request.body.raw) {
+      const escapedBody = request.body.raw.replace(/'/g, "'\\''");
+      if (!hasContentType) curl += ` \\\n  --header 'Content-Type: application/json'`;
+      curl += ` \\\n  --data '${escapedBody}'`;
+    } else if (request.body?.type === 'raw' && request.body.raw) {
+      const escapedBody = request.body.raw.replace(/'/g, "'\\''");
+      curl += ` \\\n  --data '${escapedBody}'`;
+    } else if (request.body?.type === 'x-www-form-urlencoded') {
+      const formItems = request.body.formUrlEncoded?.filter(i => i.key && i.enabled !== false) || [];
+      formItems.forEach(i => {
+        curl += ` \\\n  --data-urlencode '${i.key}=${i.value}'`;
+      });
+    } else if (request.body?.type === 'form-data') {
+      const formItems = request.body.formData?.filter(i => i.key && i.enabled !== false) || [];
+      formItems.forEach(i => {
+        curl += ` \\\n  --form '${i.key}="${i.value}"'`;
+      });
+    }
+
+    return curl;
+  }, [curlModalVisible, request]);
 
   const handleSaveClick = () => {
       const isNewRequest = !request._id || request._id.length !== 24;
@@ -191,43 +242,63 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* 顶部请求操作栏 */}
-      <div className="flex items-center px-4 py-3 border-b shrink-0 gap-2 overflow-hidden bg-white">
-        <Space.Compact className="w-full max-w-4xl shadow-sm">
-          <Select
-            value={request.method}
-            onChange={(value) => updateRequest({ method: value })}
-            options={METHODS.map((m) => ({ label: m, value: m }))}
-            className="w-28 text-center font-bold"
-            dropdownMatchSelectWidth={false}
-            size="large"
+      <div className="flex flex-col md:flex-row items-stretch md:items-center px-4 py-3 border-b shrink-0 gap-3 md:gap-2 bg-white">
+        <div className="flex items-center gap-2 w-full md:w-auto md:flex-1">
+          <Button 
+            type="text" 
+            icon={<MenuOutlined />} 
+            className="md:hidden shrink-0 -ml-2" 
+            onClick={() => setMobileDrawerOpen(true)}
           />
-          <Input
-            placeholder="Enter request URL"
-            value={request.url}
-            onChange={(e) => updateRequest({ url: e.target.value })}
-            onPressEnter={() => handleSend(true)}
+          <Space.Compact className="w-full flex-1 shadow-sm">
+            <Select
+              value={request.method}
+              onChange={(value) => updateRequest({ method: value })}
+              options={METHODS.map((m) => ({ label: m, value: m }))}
+              className="w-24 md:w-28 text-center font-bold"
+              popupMatchSelectWidth={false}
+              size="large"
+            />
+            <Input
+              placeholder="Enter request URL"
+              value={request.url}
+              onChange={(e) => updateRequest({ url: e.target.value })}
+              onPressEnter={() => handleSend(true)}
+              size="large"
+              className="flex-1 font-mono min-w-0"
+            />
+            <Button
+              type="primary"
+              icon={loading ? <LoadingOutlined /> : <SendOutlined />}
+              onClick={() => handleSend(true)}
+              loading={loading}
+              size="large"
+              className="w-12 md:w-24 font-semibold shrink-0 flex items-center justify-center p-0 md:px-4"
+            >
+              <span className="hidden md:inline ml-1">Send</span>
+            </Button>
+          </Space.Compact>
+        </div>
+
+        <div className="flex justify-end items-center gap-2 h-10">
+          <Button 
+            icon={<SaveOutlined />} 
+            onClick={handleSaveClick}
             size="large"
-            className="flex-1 font-mono"
-          />
-          <Button
-            type="primary"
-            icon={loading ? <LoadingOutlined /> : <SendOutlined />}
-            onClick={() => handleSend(true)}
-            loading={loading}
-            size="large"
-            className="w-24 font-semibold shrink-0"
+            className="font-semibold flex items-center justify-center shrink-0 flex-1 md:flex-none"
           >
-            Send
+            Save
           </Button>
-        </Space.Compact>
-        <Button 
-          icon={<SaveOutlined />} 
-          onClick={handleSaveClick}
-          size="large"
-          className="ml-2 font-semibold flex items-center justify-center shrink-0"
-        >
-          Save
-        </Button>
+          <Button 
+            icon={<CodeOutlined />} 
+            onClick={() => setCurlModalVisible(true)}
+            size="large"
+            className="flex items-center justify-center shrink-0 flex-1 md:flex-none"
+            title="Generate Code Snippets"
+          >
+            <span className="md:hidden">cURL</span>
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 bg-white" style={{ contain: 'strict' }}>
@@ -318,6 +389,48 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
             <Input placeholder="e.g. Get User Profile" autoFocus />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={
+          <div className="flex items-center justify-between mt-1 mb-2">
+            <span>Generate Code Snippet</span>
+            <Button 
+              icon={<CopyOutlined />} 
+              size="small" 
+              type="text" 
+              onClick={() => {
+                 navigator.clipboard.writeText(generatedCurl);
+                 message.success('Copied to clipboard');
+              }}
+              className="mr-6 text-blue-500 font-semibold"
+            >
+              Copy
+            </Button>
+          </div>
+        }
+        open={curlModalVisible}
+        onCancel={() => setCurlModalVisible(false)}
+        footer={null}
+        width={700}
+        styles={{ body: { padding: 0 } }}
+      >
+        <div className="h-[400px] border-t border-gray-200">
+          <Editor
+             height="100%"
+             defaultLanguage="shell"
+             value={generatedCurl}
+             theme="vs-light"
+             options={{
+               readOnly: true,
+               minimap: { enabled: false },
+               wordWrap: "on",
+               scrollBeyondLastLine: false,
+               fontSize: 13,
+               fontFamily: "Menlo, Monaco, 'Courier New', monospace"
+             }}
+          />
+        </div>
       </Modal>
     </div>
   );

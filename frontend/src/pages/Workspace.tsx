@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout, Tooltip, Avatar, Tabs, message } from 'antd';
+import { Layout, Tooltip, Avatar, Tabs, message, Drawer } from 'antd';
 import { 
   FolderOpenOutlined, 
   HistoryOutlined, 
@@ -28,11 +28,21 @@ const Workspace: React.FC = () => {
   const { 
     openRequests, 
     activeRequestId, 
+    mobileDrawerOpen,
     addRequest, 
     removeRequest, 
     setActiveRequest, 
-    clearRequests 
+    clearRequests,
+    setMobileDrawerOpen
   } = useWorkspaceStore();
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const loadProject = async () => {
     if (!id) return;
@@ -65,6 +75,7 @@ const Workspace: React.FC = () => {
 
   const handleSelectRequest = (request: ApiRequest) => {
     addRequest(request);
+    if (isMobile) setMobileDrawerOpen(false);
   };
 
   const handleNewRequest = () => {
@@ -95,8 +106,9 @@ const Workspace: React.FC = () => {
 
   return (
     <Layout className="h-screen overflow-hidden bg-white dark:bg-[#1e1e1e]">
-      <Sider width={56} className="bg-gray-50 border-r border-gray-200 shadow-sm z-10 relative" theme="light">
-        <div className="flex flex-col items-center py-4 h-full w-full">
+      <div className="hidden md:block h-full">
+        <Sider width={56} className="bg-gray-50 border-r border-gray-200 shadow-sm z-10 relative h-full" theme="light">
+          <div className="flex flex-col items-center py-4 h-full w-full">
           <div className="flex flex-col items-center gap-6 mt-4 flex-1">
             <Tooltip placement="right" title="Projects">
               <AppstoreOutlined className="text-xl text-gray-400 hover:text-blue-500 cursor-pointer" onClick={() => navigate('/')} />
@@ -111,13 +123,40 @@ const Workspace: React.FC = () => {
           <div className="flex flex-col items-center mb-4 shrink-0">
             <SettingOutlined className="text-xl text-gray-400 hover:text-blue-500 cursor-pointer" />
           </div>
+          </div>
+        </Sider>
+      </div>
+
+      <Drawer
+        title="Flux API Workspace"
+        placement="left"
+        onClose={() => setMobileDrawerOpen(false)}
+        open={mobileDrawerOpen}
+        width={320}
+        styles={{ body: { padding: 0 } }}
+      >
+        <div className="h-full flex flex-col bg-white">
+          <div className="h-12 border-b flex items-center px-4 font-semibold shrink-0 justify-between">
+            <span>Collections</span>
+            <PlusOutlined className="cursor-pointer hover:text-blue-500" onClick={handleNewRequest} />
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <RequestList
+              requests={requests}
+              selectedId={activeRequestId || undefined}
+              onSelect={handleSelectRequest}
+              onDelete={handleDeleteRequest}
+              onNew={handleNewRequest}
+              loading={loading}
+            />
+          </div>
         </div>
-      </Sider>
+      </Drawer>
 
       <Layout>
         {/* 全局可拖拽分屏 */}
         <Allotment>
-          <Allotment.Pane preferredSize={320} minSize={250} maxSize={500}>
+          <Allotment.Pane visible={!isMobile} preferredSize={320} minSize={250} maxSize={500}>
             <div className="h-full bg-white flex flex-col border-r border-gray-200">
               <div className="h-12 border-b flex items-center px-4 font-semibold shrink-0 justify-between">
                 <span>Collections</span>

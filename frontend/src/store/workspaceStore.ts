@@ -10,12 +10,14 @@ export interface TabRequest extends ApiRequest {
 interface WorkspaceState {
   openRequests: TabRequest[];
   activeRequestId: string | null;
+  mobileDrawerOpen: boolean;
   addRequest: (request: Partial<TabRequest>) => void;
   removeRequest: (id: string) => void;
   updateRequest: (id: string, updates: Partial<TabRequest>) => void;
   setActiveRequest: (id: string) => void;
   setOpenRequests: (requests: TabRequest[]) => void;
   clearRequests: () => void;
+  setMobileDrawerOpen: (open: boolean) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -23,6 +25,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     (set) => ({
       openRequests: [],
       activeRequestId: null,
+      mobileDrawerOpen: false,
 
       addRequest: (request) =>
         set((state) => {
@@ -79,6 +82,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setActiveRequest: (id) => set({ activeRequestId: id }),
       setOpenRequests: (openRequests) => set({ openRequests }),
       clearRequests: () => set({ openRequests: [], activeRequestId: null }),
+      setMobileDrawerOpen: (open) => set({ mobileDrawerOpen: open }),
     }),
     {
       name: 'flux-workspace-storage',
