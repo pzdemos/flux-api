@@ -31,8 +31,13 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
   const [response, setResponse] = useState(request.response);
   const setMobileDrawerOpen = useWorkspaceStore(state => state.setMobileDrawerOpen);
 
-  // Sync internal request when prop changes (for new tabs)
-  // We don't overwrite if we are dirty, since Zustand manages it.
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const updateRequest = (updates: Partial<ApiRequest>) => {
     if (onChange) {
@@ -59,7 +64,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
         }
       } else {
         const payload = { ...request };
-        delete payload._id; // Ensure we don't accidentally send nanoid
+        delete payload._id;
         res = await requestApi.sendOnly(payload as ApiRequest);
         setResponse(res.data);
       }
@@ -78,12 +83,10 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     if (!curlModalVisible) return '';
     let curl = `curl --request ${request.method} \\\n  --url '${request.url || ''}'`;
     
-    // Auth
     if (request.auth?.type === 'bearer' && request.auth.bearer?.token) {
       curl += ` \\\n  --header 'Authorization: Bearer ${request.auth.bearer.token}'`;
     }
     
-    // Headers
     const headers = request.headers?.filter(h => h.key && h.enabled !== false) || [];
     let hasContentType = false;
     headers.forEach(h => {
@@ -91,7 +94,6 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
       if (h.key.toLowerCase() === 'content-type') hasContentType = true;
     });
 
-    // Params
     const params = request.params?.filter(p => p.key && p.enabled !== false) || [];
     if (params.length > 0) {
       const queryString = params.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
@@ -99,7 +101,6 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
       curl = curl.replace(`'${request.url}'`, `'${request.url}${hasQuery ? '&' : '?'}${queryString}'`);
     }
 
-    // Body
     if (request.body?.type === 'json' && request.body.raw) {
       const escapedBody = request.body.raw.replace(/'/g, "'\\''");
       if (!hasContentType) curl += ` \\\n  --header 'Content-Type: application/json'`;
@@ -141,7 +142,6 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     setLoading(true);
     setSaveModalVisible(false);
     
-    // Update local state and store with new name
     updateRequest({ name: finalName });
 
     try {
@@ -153,7 +153,7 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
         res = await requestApi.update(request._id as string, payload);
         message.success('Request updated');
       } else {
-        delete payload._id; // Remove local nanoid before sending to DB
+        delete payload._id;
         res = await requestApi.create(payload as ApiRequest);
         message.success('Request saved');
       }
@@ -239,72 +239,275 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
     },
   ];
 
-  return (
-    <div className="flex flex-col h-full bg-white relative">
-      {/* 顶部请求操作栏 */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center px-4 py-3 border-b shrink-0 gap-3 md:gap-2 bg-white">
-        <div className="flex items-center gap-2 w-full md:w-auto md:flex-1">
-          <Button 
-            type="text" 
-            icon={<MenuOutlined />} 
-            className="md:hidden shrink-0 -ml-2" 
-            onClick={() => setMobileDrawerOpen(true)}
-          />
-          <Space.Compact className="w-full flex-1 shadow-sm">
-            <Select
-              value={request.method}
-              onChange={(value) => updateRequest({ method: value })}
-              options={METHODS.map((m) => ({ label: m, value: m }))}
-              className="w-24 md:w-28 text-center font-bold"
-              popupMatchSelectWidth={false}
-              size="large"
-            />
+  // ========== Mobile Layout ==========
+  if (isMobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff', position: 'relative' }}>
+        {/* Mobile URL Bar */}
+        <div className="mobile-url-bar">
+          <div style={{ padding: '0 0 8px 4px' }}>
             <Input
-              placeholder="Enter request URL"
-              value={request.url}
-              onChange={(e) => updateRequest({ url: e.target.value })}
-              onPressEnter={() => handleSend(true)}
-              size="large"
-              className="flex-1 font-mono min-w-0"
+              variant="borderless"
+              placeholder="Untitled Request"
+              value={request.name || ''}
+              onChange={(e) => updateRequest({ name: e.target.value })}
+              style={{ fontSize: 16, fontWeight: 700, padding: 0, height: 'auto', background: 'transparent' }}
             />
+          </div>
+          <div className="mobile-url-row">
+            <Space.Compact style={{ width: '100%', flex: 1 }}>
+              <Select
+                value={request.method}
+                onChange={(value) => updateRequest({ method: value })}
+                options={METHODS.map((m) => ({ label: m, value: m }))}
+                style={{ width: 90 }}
+                popupMatchSelectWidth={false}
+                size="large"
+              />
+              <Input
+                placeholder="Enter request URL"
+                value={request.url}
+                onChange={(e) => updateRequest({ url: e.target.value })}
+                onPressEnter={() => handleSend(true)}
+                size="large"
+                style={{ flex: 1, fontFamily: "'SF Mono', Menlo, Monaco, monospace", fontSize: 13 }}
+              />
+              <Button
+                type="primary"
+                icon={loading ? <LoadingOutlined /> : <SendOutlined />}
+                onClick={() => handleSend(true)}
+                loading={loading}
+                size="large"
+                className="mobile-send-btn"
+              />
+            </Space.Compact>
+          </div>
+
+          {/* Action Chips */}
+          <div className="mobile-action-bar">
             <Button
-              type="primary"
-              icon={loading ? <LoadingOutlined /> : <SendOutlined />}
-              onClick={() => handleSend(true)}
-              loading={loading}
-              size="large"
-              className="w-12 md:w-24 font-semibold shrink-0 flex items-center justify-center p-0 md:px-4"
+              icon={<SaveOutlined />}
+              onClick={handleSaveClick}
+              className="mobile-action-chip"
             >
-              <span className="hidden md:inline ml-1">Send</span>
+              Save
             </Button>
-          </Space.Compact>
+            <Button
+              icon={<CodeOutlined />}
+              onClick={() => setCurlModalVisible(true)}
+              className="mobile-action-chip"
+            >
+              cURL
+            </Button>
+          </div>
         </div>
 
-        <div className="flex justify-end items-center gap-2 h-10">
-          <Button 
-            icon={<SaveOutlined />} 
-            onClick={handleSaveClick}
-            size="large"
-            className="font-semibold flex items-center justify-center shrink-0 flex-1 md:flex-none"
-          >
-            Save
-          </Button>
-          <Button 
-            icon={<CodeOutlined />} 
-            onClick={() => setCurlModalVisible(true)}
-            size="large"
-            className="flex items-center justify-center shrink-0 flex-1 md:flex-none"
-            title="Generate Code Snippets"
-          >
-            <span className="md:hidden">cURL</span>
-          </Button>
+        {/* Content Area with vertical split */}
+        <div style={{ flex: 1, overflow: 'hidden', contain: 'strict' }}>
+          <Allotment vertical defaultSizes={[55, 45]}>
+            <Allotment.Pane minSize={120}>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+                <Tabs
+                  defaultActiveKey="params"
+                  className="flex-1"
+                  tabBarStyle={{ margin: 0, paddingLeft: 12, fontSize: 13 }}
+                  size="small"
+                  items={[
+                    {
+                      key: 'params',
+                      label: 'Params',
+                      children: (
+                        <div style={{ padding: 12, overflow: 'auto', height: '100%' }}>
+                          <KeyValueEditor
+                            items={request.params || []}
+                            onChange={(items) => updateRequest({ params: items })}
+                            placeholder={{ key: 'Query Param', value: 'Value' }}
+                          />
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'headers',
+                      label: 'Headers',
+                      children: (
+                        <div style={{ padding: 12, overflow: 'auto', height: '100%' }}>
+                          <KeyValueEditor
+                            items={request.headers || []}
+                            onChange={(items) => updateRequest({ headers: items })}
+                          />
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'body',
+                      label: 'Body',
+                      children: (
+                        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 8 }}>
+                          <Tabs
+                            size="small"
+                            type="card"
+                            activeKey={request.body?.type || 'none'}
+                            onChange={(key) =>
+                              updateRequest({
+                                body: { ...request.body!, type: key as BodyConfig['type'] },
+                              })
+                            }
+                            items={bodyItems}
+                            className="flex-1"
+                          />
+                        </div>
+                      ),
+                    },
+                  ]}
+               />
+              </div>
+            </Allotment.Pane>
+            <Allotment.Pane minSize={80}>
+              <div style={{ height: '100%', borderTop: '0.5px solid var(--color-border-light)', background: '#fafbfc', position: 'relative' }}>
+                <ResponseViewer response={response} loading={loading} isMobile={true} />
+              </div>
+            </Allotment.Pane>
+          </Allotment>
+        </div>
+
+        {/* Modals */}
+        <Modal
+          title="Save Request"
+          open={saveModalVisible}
+          onOk={() => {
+            saveForm.validateFields().then((values) => {
+              executeSave(values.name);
+            });
+          }}
+          onCancel={() => setSaveModalVisible(false)}
+          okText="Save"
+        >
+          <Form form={saveForm} layout="vertical" className="mt-4">
+            <Form.Item
+              name="name"
+              label="Request Name"
+              rules={[{ required: true, message: 'Please enter a name for this request' }]}
+            >
+              <Input placeholder="e.g. Get User Profile" autoFocus />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal
+          title={
+            <div className="flex items-center justify-between mt-1 mb-2">
+              <span>Generate Code Snippet</span>
+              <Button 
+                icon={<CopyOutlined />} 
+                size="small" 
+                type="text" 
+                onClick={() => {
+                   navigator.clipboard.writeText(generatedCurl);
+                   message.success('Copied to clipboard');
+                }}
+                className="mr-6 text-blue-500 font-semibold"
+              >
+                Copy
+              </Button>
+            </div>
+          }
+          open={curlModalVisible}
+          onCancel={() => setCurlModalVisible(false)}
+          footer={null}
+          width={isMobile ? '95vw' : 700}
+          styles={{ body: { padding: 0 } }}
+        >
+          <div style={{ height: isMobile ? 280 : 400, borderTop: '1px solid #f0f0f0' }}>
+            <Editor
+               height="100%"
+               defaultLanguage="shell"
+               value={generatedCurl}
+               theme="vs-light"
+               options={{
+                 readOnly: true,
+                 minimap: { enabled: false },
+                 wordWrap: "on",
+                 scrollBeyondLastLine: false,
+                 fontSize: 12,
+                 fontFamily: "Menlo, Monaco, 'Courier New', monospace"
+               }}
+            />
+          </div>
+        </Modal>
+      </div>
+    );
+  }
+
+  // ========== Desktop Layout ==========
+  return (
+    <div className="flex flex-col h-full bg-white relative">
+      <div className="flex flex-col px-4 py-3 border-b shrink-0 gap-3 bg-white">
+        <div className="flex items-center">
+          <Input 
+            variant="borderless"
+            placeholder="Untitled Request"
+            value={request.name || ''}
+            onChange={(e) => updateRequest({ name: e.target.value })}
+            className="text-lg font-semibold px-1 py-0 h-8 max-w-sm hover:hover:bg-gray-50 focus:bg-white transition-colors"
+            style={{ minWidth: 250, border: '1px solid transparent' }}
+          />
+        </div>
+        <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center md:gap-2">
+          <div className="flex items-center gap-2 w-full md:flex-1">
+            <Space.Compact className="w-full flex-1 shadow-sm object-contain">
+              <Select
+                value={request.method}
+                onChange={(value) => updateRequest({ method: value })}
+                options={METHODS.map((m) => ({ label: m, value: m }))}
+                className="w-24 md:w-28 text-center font-bold"
+                popupMatchSelectWidth={false}
+                size="large"
+              />
+              <Input
+                placeholder="Enter request URL"
+                value={request.url}
+                onChange={(e) => updateRequest({ url: e.target.value })}
+                onPressEnter={() => handleSend(true)}
+                size="large"
+                className="flex-1 font-mono min-w-0"
+              />
+              <Button
+                type="primary"
+                icon={loading ? <LoadingOutlined /> : <SendOutlined />}
+                onClick={() => handleSend(true)}
+                loading={loading}
+                size="large"
+                className="w-24 font-semibold shrink-0 flex items-center justify-center px-4"
+              >
+                <span className="ml-1">Send</span>
+              </Button>
+            </Space.Compact>
+          </div>
+
+          <div className="flex justify-end items-center gap-2">
+            <Button 
+              icon={<SaveOutlined />} 
+              onClick={handleSaveClick}
+              size="large"
+              className="font-semibold flex items-center justify-center shrink-0"
+            >
+              Save
+            </Button>
+            <Button 
+              icon={<CodeOutlined />} 
+              onClick={() => setCurlModalVisible(true)}
+              size="large"
+              className="flex items-center justify-center shrink-0"
+            >
+              cURL
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 bg-white" style={{ contain: 'strict' }}>
-        <Allotment vertical defaultSizes={[50, 50]}>
+      <div className="flex-1 bg-white overflow-hidden" style={{ contain: 'strict' }}>
+        <Allotment vertical={false} defaultSizes={[50, 50]}>
           <Allotment.Pane minSize={150}>
-             {/* Request Configuration */}
              <div className="flex flex-col h-full relative">
                <Tabs
                   defaultActiveKey="params"
@@ -361,7 +564,6 @@ export const RequestEditor: React.FC<RequestEditorProps> = ({
              </div>
           </Allotment.Pane>
           <Allotment.Pane minSize={100}>
-            {/* Response Viewer */}
             <div className="h-full border-t border-gray-200 bg-gray-50 relative">
                <ResponseViewer response={response} loading={loading} />
             </div>

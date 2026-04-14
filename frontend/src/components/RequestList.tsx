@@ -10,6 +10,7 @@ interface RequestListProps {
   onDelete?: (id: string) => void;
   onNew?: () => void;
   loading?: boolean;
+  isMobile?: boolean;
 }
 
 const methodColors: Record<string, string> = {
@@ -22,12 +23,23 @@ const methodColors: Record<string, string> = {
   OPTIONS: 'text-purple-500',
 };
 
+const methodBadgeClass: Record<string, string> = {
+  GET: 'get',
+  POST: 'post',
+  PUT: 'put',
+  DELETE: 'delete',
+  PATCH: 'patch',
+  HEAD: 'head',
+  OPTIONS: 'options',
+};
+
 export const RequestList: React.FC<RequestListProps> = ({
   requests,
   selectedId,
   onSelect,
   onDelete,
   loading = false,
+  isMobile = false,
 }) => {
   if (loading) {
     return (
@@ -45,6 +57,91 @@ export const RequestList: React.FC<RequestListProps> = ({
     );
   }
 
+  // ========== Mobile Layout ==========
+  if (isMobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {requests.map((request, index) => {
+          const isActive = selectedId === request._id;
+          return (
+            <div
+              key={request._id}
+              onClick={() => onSelect(request)}
+              className={`mobile-request-item ${isActive ? 'active' : ''} animate-slide-in`}
+              style={{ animationDelay: `${index * 30}ms` }}
+            >
+              <span className={`method-badge ${methodBadgeClass[request.method] || ''}`}>
+                {request.method}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 14,
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {request.name || 'Untitled'}
+                </div>
+                {request.url && (
+                  <div style={{
+                    fontSize: 11,
+                    color: 'var(--color-text-muted)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    marginTop: 2,
+                    fontFamily: "'SF Mono', monospace",
+                  }}>
+                    {request.url}
+                  </div>
+                )}
+              </div>
+              
+              {onDelete && (
+                <Dropdown
+                  trigger={['click']}
+                  menu={{
+                    items: [
+                      {
+                        key: 'delete',
+                        danger: true,
+                        label: 'Delete Request',
+                        icon: <DeleteOutlined />,
+                        onClick: (e) => {
+                          e.domEvent.stopPropagation();
+                          onDelete(request._id);
+                        }
+                      }
+                    ]
+                  }}
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      width: 30,
+                      height: 30,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '50%',
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <MoreOutlined style={{ color: 'var(--color-text-muted)', fontSize: 16 }} />
+                  </div>
+                </Dropdown>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ========== Desktop Layout ==========
   return (
     <div className="flex flex-col bg-white dark:bg-[#1e1e1e] h-full">
       {requests.map((request) => {

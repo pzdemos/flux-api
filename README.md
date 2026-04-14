@@ -8,6 +8,7 @@
 - 请求管理：保存和管理 API 请求
 - 支持 HTTP 方法：GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
 - 请求配置：
+  - 可点击编辑的请求名称字段
   - URL 参数 (Query Params)
   - 请求头 (Headers)
   - 请求体 (Body): raw, json, form-data, x-www-form-urlencoded
@@ -15,6 +16,22 @@
 - 响应查看：状态码、响应时间、响应大小、Headers、Body
 - JSON 响应格式化显示
 - 数据持久化存储在 MongoDB
+- 首页控制台风格设计（参考阿里云控制台）：
+  - Flux API 渐变艺术字品牌 Logo
+  - 顶部导航栏 + 页面标题区
+  - 表格式项目列表带搜索过滤
+  - 小巧精致的按钮和交互元素
+- 移动端专业适配：
+  - 毛玻璃（Glassmorphism）头部设计
+  - 渐变色品牌 Drawer 侧边栏
+  - 药丸式导航切换（Collections / History）
+  - 紧凑型 URL 输入栏 + 渐变发送按钮
+  - 彩色 HTTP Method 徽章
+  - 请求列表显示 URL 预览
+  - 响应状态栏自适应布局
+  - 入场滑入微动画
+  - 触控优化（按压缩放反馈）
+  - Safe Area 适配（iPhone 刘海屏 / 底部手势区域）
 
 ## 技术栈
 
